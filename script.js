@@ -43,3 +43,45 @@ if ("IntersectionObserver" in window) {
 }
 
 document.querySelector("#year").textContent = new Date().getFullYear();
+
+const goatCounterSite = "https://abisekdewan.goatcounter.com";
+
+// Count only the published website, so local previews do not inflate visits.
+if (location.protocol === "https:" && location.hostname === "abisekdewan.github.io") {
+  const tracker = document.createElement("script");
+  tracker.src = "https://gc.zgo.at/count.js";
+  tracker.async = true;
+  tracker.setAttribute("data-goatcounter", `${goatCounterSite}/count`);
+  // This is one page: anchors, index.html, and query strings share one total.
+  tracker.setAttribute("data-goatcounter-settings", JSON.stringify({ path: "/", no_events: true }));
+  document.head.appendChild(tracker);
+}
+
+async function updateVisitCount() {
+  const counter = document.querySelector("#visit-count");
+  if (!counter) return;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${goatCounterSite}/counter/TOTAL.json`, {
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error("Visit count unavailable");
+    const data = await response.json();
+    const count = typeof data.count === "string" ? data.count : String(data.count);
+    if (!/^\d[\d,]*$/.test(count)) throw new Error("Invalid visit count");
+    counter.textContent = count;
+    counter.title = "Visits since the counter was added; updated periodically.";
+  } catch {
+    // A blocked or unavailable counter should never show a fabricated number.
+    counter.textContent = "—";
+    counter.title = "Visit count is temporarily unavailable.";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+updateVisitCount();
